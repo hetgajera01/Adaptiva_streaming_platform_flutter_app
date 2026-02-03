@@ -3,13 +3,16 @@ import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/widgets/custom_button.dart';
 import 'package:mad_project/widgets/custom_text_field.dart';
+import 'package:mad_project/services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
+  final AuthService authService;
   final VoidCallback onSignUpSuccess;
   final VoidCallback onNavigateToSignIn;
 
   const SignUpScreen({
     super.key,
+    required this.authService,
     required this.onSignUpSuccess,
     required this.onNavigateToSignIn,
   });
@@ -57,18 +60,52 @@ class _SignUpScreenState extends State<SignUpScreen>
     _animationController.forward();
   }
 
-  void _handleSignUp() {
+  void _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+      // Check if passwords match
+      if (_passwordController.text != _confirmController.text) {
+        _showErrorSnackBar('Passwords do not match');
+        return;
+      }
 
-      // Simulate API call
-      Future.delayed(AppConstants.animationSlow, () {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        // Call auth service to register
+        await widget.authService.register(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+        );
+
         if (mounted) {
           setState(() => _isLoading = false);
           widget.onSignUpSuccess();
         }
-      });
+      } on AuthException catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        _showErrorSnackBar(e.message);
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        _showErrorSnackBar('An unexpected error occurred');
+      }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.errorColor,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   @override
@@ -202,7 +239,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                               // Password Field
                               CustomTextField(
                                 label: 'Password',
-                                hint: 'Create a password',
+                                hint: 'Create a password (min 8 chars, uppercase, lowercase, number)',
                                 controller: _passwordController,
                                 obscureText: true,
                                 prefixIcon: Icons.lock_outline,
@@ -211,8 +248,17 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   if (value == null || value.isEmpty) {
                                     return 'Password is required';
                                   }
-                                  if (value.length < 6) {
-                                    return 'Password must be at least 6 characters';
+                                  if (value.length < 8) {
+                                    return 'Password must be at least 8 characters';
+                                  }
+                                  if (!value.contains(RegExp(r'[A-Z]'))) {
+                                    return 'Password must contain uppercase letter';
+                                  }
+                                  if (!value.contains(RegExp(r'[a-z]'))) {
+                                    return 'Password must contain lowercase letter';
+                                  }
+                                  if (!value.contains(RegExp(r'[0-9]'))) {
+                                    return 'Password must contain a number';
                                   }
                                   return null;
                                 },
@@ -271,7 +317,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     child: Text(
                                       'Sign In',
                                       style: AppTheme.bodyMedium.copyWith(
-                                        color: AppTheme.primaryColor,
+                                        color: AppTheme.accentColor,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

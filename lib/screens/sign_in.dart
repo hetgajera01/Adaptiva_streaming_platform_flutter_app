@@ -3,13 +3,16 @@ import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/widgets/custom_button.dart';
 import 'package:mad_project/widgets/custom_text_field.dart';
+import 'package:mad_project/services/auth_service.dart';
 
 class SignInScreen extends StatefulWidget {
+  final AuthService authService;
   final VoidCallback onSignInSuccess;
   final VoidCallback onNavigateToSignUp;
 
   const SignInScreen({
     super.key,
+    required this.authService,
     required this.onSignInSuccess,
     required this.onNavigateToSignUp,
   });
@@ -55,18 +58,45 @@ class _SignInScreenState extends State<SignInScreen>
     _animationController.forward();
   }
 
-  void _handleSignIn() {
+  void _handleSignIn() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+      });
 
-      // Simulate API call
-      Future.delayed(AppConstants.animationSlow, () {
+      try {
+        // Call auth service to sign in
+        await widget.authService.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
         if (mounted) {
           setState(() => _isLoading = false);
           widget.onSignInSuccess();
         }
-      });
+      } on AuthException catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        _showErrorSnackBar(e.message);
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        _showErrorSnackBar('An unexpected error occurred');
+      }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.errorColor,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   @override
@@ -216,7 +246,7 @@ class _SignInScreenState extends State<SignInScreen>
                                   child: Text(
                                     'Forgot Password?',
                                     style: AppTheme.bodyMedium.copyWith(
-                                      color: AppTheme.primaryColor,
+                                      color: AppTheme.accentColor,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -287,7 +317,7 @@ class _SignInScreenState extends State<SignInScreen>
                                     child: Text(
                                       'Create Account',
                                       style: AppTheme.bodyMedium.copyWith(
-                                        color: AppTheme.primaryColor,
+                                        color: AppTheme.accentColor,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

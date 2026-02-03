@@ -78,6 +78,7 @@ class FeatureCard extends StatelessWidget {
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Icon Container
             Container(
@@ -89,7 +90,7 @@ class FeatureCard extends StatelessWidget {
               ),
               child: Icon(icon, color: iconColor, size: 28),
             ),
-            const SizedBox(height: AppConstants.spacingMedium),
+            const SizedBox(height: AppConstants.spacingSmall),
 
             // Title
             Text(
@@ -98,17 +99,19 @@ class FeatureCard extends StatelessWidget {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
 
             // Description
-            Text(
-              description,
-              style: AppTheme.bodySmall.copyWith(
-                color: AppTheme.textSecondary,
-                height: 1.4,
+            Expanded(
+              child: Text(
+                description,
+                style: AppTheme.bodySmall.copyWith(
+                  color: Color(0xFF64748B),
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

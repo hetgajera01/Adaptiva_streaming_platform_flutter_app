@@ -4,29 +4,40 @@ import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/screens/sign_in.dart';
 import 'package:mad_project/screens/sign_up.dart';
 import 'package:mad_project/screens/home.dart';
+import 'package:mad_project/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase initialization removed
-  runApp(const MyApp());
+  
+  // Initialize auth service
+  final authService = AuthService();
+  await authService.initialize();
+  
+  runApp(MyApp(authService: authService));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  final AuthService authService;
+
+  const MyApp({super.key, required this.authService});
 
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.light;
   bool _isSignedIn = false;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
-  void _toggleTheme() {
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  void _checkLoginStatus() {
     setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _isSignedIn = widget.authService.isLoggedIn;
     });
   }
 
@@ -35,13 +46,26 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _handleSignOut() {
-    setState(() => _isSignedIn = false);
+    widget.authService.signOut().then((_) {
+      setState(() => _isSignedIn = false);
+      _navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => SignInScreen(
+            authService: widget.authService,
+            onSignInSuccess: _handleSignIn,
+            onNavigateToSignUp: _navigateToSignUp,
+          ),
+        ),
+        (route) => false,
+      );
+    });
   }
 
   void _navigateToSignUp() {
     _navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) => SignUpScreen(
+          authService: widget.authService,
           onSignUpSuccess: () {
             _navigatorKey.currentState?.pop();
             _handleSignIn();
@@ -60,13 +84,13 @@ class _MyAppState extends State<MyApp> {
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: _themeMode,
+      themeMode: ThemeMode.light,
       home: _isSignedIn
           ? HomeScreen(
-              onThemeToggle: _toggleTheme,
               onSignOut: _handleSignOut,
             )
           : SignInScreen(
+              authService: widget.authService,
               onSignInSuccess: _handleSignIn,
               onNavigateToSignUp: _navigateToSignUp,
             ),

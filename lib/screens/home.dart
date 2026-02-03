@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/widgets/custom_card.dart';
+import 'package:mad_project/screens/settings.dart';
 
 class HomeScreen extends StatefulWidget {
-  final VoidCallback onThemeToggle;
   final VoidCallback onSignOut;
 
   const HomeScreen({
     super.key,
-    required this.onThemeToggle,
     required this.onSignOut,
   });
 
@@ -39,14 +38,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.brightness_4, color: Colors.white),
-            onPressed: widget.onThemeToggle,
-            tooltip: 'Toggle Theme',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: widget.onSignOut,
-            tooltip: 'Sign Out',
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(onSignOut: widget.onSignOut),
+                ),
+              );
+            },
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -69,16 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: AppConstants.spacingLarge),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add new item feature!')),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Item'),
-        backgroundColor: AppTheme.primaryColor,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -272,25 +263,25 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Movies',
         description: 'Watch latest blockbuster movies',
         icon: Icons.movie,
-        iconColor: AppTheme.primaryColor,
+        iconColor: AppTheme.accentColor, // Crimson Red
       ),
       FeatureCard(
         title: 'Series',
         description: 'Binge-watch amazing TV series',
         icon: Icons.tv,
-        iconColor: AppTheme.secondaryColor,
+        iconColor: AppTheme.infoColor, // Blue
       ),
       FeatureCard(
         title: 'Documentaries',
         description: 'Learn from real-world stories',
         icon: Icons.document_scanner,
-        iconColor: AppTheme.successColor,
+        iconColor: AppTheme.successColor, // Emerald Green
       ),
       FeatureCard(
         title: 'Kids',
         description: 'Safe content for children',
         icon: Icons.child_care,
-        iconColor: AppTheme.warningColor,
+        iconColor: AppTheme.warningColor, // Amber
       ),
     ];
 
