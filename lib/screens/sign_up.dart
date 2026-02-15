@@ -239,7 +239,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                               // Password Field
                               CustomTextField(
                                 label: 'Password',
-                                hint: 'Create a password (min 8 chars, uppercase, lowercase, number)',
+                                hint: 'Create a password (min 6 chars, uppercase, lowercase, number)',
                                 controller: _passwordController,
                                 obscureText: true,
                                 prefixIcon: Icons.lock_outline,
@@ -248,8 +248,8 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   if (value == null || value.isEmpty) {
                                     return 'Password is required';
                                   }
-                                  if (value.length < 8) {
-                                    return 'Password must be at least 8 characters';
+                                  if (value.length < 6) {
+                                    return 'Password must be at least 6 characters';
                                   }
                                   if (!value.contains(RegExp(r'[A-Z]'))) {
                                     return 'Password must contain uppercase letter';

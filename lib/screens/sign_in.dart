@@ -4,6 +4,7 @@ import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/widgets/custom_button.dart';
 import 'package:mad_project/widgets/custom_text_field.dart';
 import 'package:mad_project/services/auth_service.dart';
+import 'package:mad_project/screens/home.dart';
 
 class SignInScreen extends StatefulWidget {
   final AuthService authService;
@@ -73,18 +74,47 @@ class _SignInScreenState extends State<SignInScreen>
 
         if (mounted) {
           setState(() => _isLoading = false);
+          
+          // Navigate to home screen and clear navigation stack
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                onSignOut: () {
+                  // This will be handled by the parent widget
+                  widget.authService.signOut().then((_) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) => SignInScreen(
+                          authService: widget.authService,
+                          onSignInSuccess: widget.onSignInSuccess,
+                          onNavigateToSignUp: widget.onNavigateToSignUp,
+                        ),
+                      ),
+                      (route) => false,
+                    );
+                  });
+                },
+              ),
+            ),
+            (route) => false, // Remove all previous routes
+          );
+          
+          // Also call the callback to update parent state
           widget.onSignInSuccess();
         }
       } on AuthException catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
         }
+        print('AuthException in sign-in screen: ${e.message}');
         _showErrorSnackBar(e.message);
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
         }
-        _showErrorSnackBar('An unexpected error occurred');
+        print('Unexpected error in sign-in screen: $e');
+        print('Error type: ${e.runtimeType}');
+        _showErrorSnackBar('Sign in failed: ${e.toString()}');
       }
     }
   }

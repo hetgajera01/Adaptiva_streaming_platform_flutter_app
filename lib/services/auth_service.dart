@@ -1,4 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:convert';
 
 /// Exception classes for authentication errors
@@ -12,7 +14,7 @@ class AuthException implements Exception {
 
 class WeakPasswordException extends AuthException {
   WeakPasswordException()
-      : super('Password is too weak. Use at least 8 characters with uppercase, lowercase, and numbers.');
+      : super('Password is too weak. Use at least 6 characters with uppercase, lowercase, and numbers.');
 }
 
 class EmailAlreadyInUseException extends AuthException {
@@ -82,23 +84,18 @@ class AuthService {
 
   late SharedPreferences _prefs;
   User? _currentUser;
+  late DatabaseReference _database;
+  late firebase_auth.FirebaseAuth _auth;
   
   static const String _userKey = 'current_user';
   static const String _isLoggedInKey = 'is_logged_in';
   static const String _sessionTokenKey = 'session_token';
-  
-  // Mock database - in production, use Firebase or your backend
-  static final Map<String, Map<String, String>> _mockUserDatabase = {
-    'test@example.com': {
-      'id': '1',
-      'password': 'Test@1234', // In production, never store plain passwords!
-      'name': 'Test User',
-    },
-  };
 
   /// Initialize the auth service
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    _database = FirebaseDatabase.instance.ref();
+    _auth = firebase_auth.FirebaseAuth.instance;
     await _restoreSession();
   }
 
@@ -129,14 +126,13 @@ class AuthService {
     return emailRegex.hasMatch(email);
   }
 
-  /// Validate password strength
+  /// Validate password strength (basic check, Firebase will enforce its own rules)
   bool _isValidPassword(String password) {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$');
-    return passwordRegex.hasMatch(password);
+    // At least 6 characters
+    return password.length >= 6;
   }
 
-  /// Register a new user
+  /// Register a new user with Firebase Authentication
   Future<User> register({
     required String email,
     required String password,
@@ -156,78 +152,149 @@ class AuthService {
         throw AuthException('Please enter your name.');
       }
 
-      // Check if email already exists (simulate database check)
-      if (_mockUserDatabase.containsKey(email.toLowerCase())) {
-        throw EmailAlreadyInUseException();
+      // Create user with Firebase Authentication
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        throw AuthException('Failed to create user account.');
       }
 
-      // Simulate API call delay
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Create new user
+      // Create user object
       final newUser = User(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: firebaseUser.uid,
         email: email.toLowerCase(),
         name: name,
       );
 
-      // Save user details to database (simulated)
-      _mockUserDatabase[email.toLowerCase()] = {
-        'id': newUser.id,
-        'password': password, // In production: hash the password!
+      // Save user profile data to Realtime Database (NOT password)
+      await _database.child('users').child(firebaseUser.uid).set({
+        'id': firebaseUser.uid,
+        'email': email.toLowerCase(),
         'name': name,
-      };
+        'createdAt': DateTime.now().toIso8601String(),
+      });
 
       // Save to local storage
       await _saveUserSession(newUser);
 
       return newUser;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        throw WeakPasswordException();
+      } else if (e.code == 'email-already-in-use') {
+        throw EmailAlreadyInUseException();
+      } else if (e.code == 'invalid-email') {
+        throw InvalidEmailException();
+      } else {
+        throw AuthException(e.message ?? 'Registration failed.');
+      }
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Sign in with email and password
+  /// Sign in with Firebase Authentication
   Future<User> signIn({
     required String email,
     required String password,
   }) async {
     try {
+      print('=== SIGN IN START ===');
+      print('Email: $email');
+      
       // Validate inputs
       if (email.isEmpty || !_isValidEmail(email)) {
+        print('Invalid email format');
         throw InvalidEmailException();
       }
 
       if (password.isEmpty) {
+        print('Password is empty');
         throw AuthException('Please enter your password.');
       }
 
-      // Simulate network call
-      await Future.delayed(const Duration(milliseconds: 500));
+      print('Calling Firebase signInWithEmailAndPassword...');
+      
+      // Sign in with Firebase Authentication
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
 
-      // Check if user exists
-      final userData = _mockUserDatabase[email.toLowerCase()];
-      if (userData == null) {
-        throw UserNotFoundException();
+      print('Firebase authentication successful');
+      
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        print('Firebase user is null');
+        throw AuthException('Sign in failed.');
       }
 
-      // Check password (in production: use bcrypt or similar)
-      if (userData['password'] != password) {
-        throw WrongPasswordException();
+      print('Firebase UID: ${firebaseUser.uid}');
+      print('Checking Realtime Database for user profile...');
+      
+      // Get user profile data from Realtime Database
+      final snapshot = await _database.child('users').child(firebaseUser.uid).get();
+      
+      String userName;
+      
+      if (!snapshot.exists) {
+        print('User profile not found in database, creating new profile...');
+        // User exists in Firebase Auth but not in Realtime Database
+        // This can happen if the user was created directly in Firebase Console
+        // or if there was an issue during registration
+        // Create a basic profile for them
+        userName = firebaseUser.email?.split('@')[0] ?? 'User';
+        
+        print('Creating profile with username: $userName');
+        
+        await _database.child('users').child(firebaseUser.uid).set({
+          'id': firebaseUser.uid,
+          'email': email.toLowerCase(),
+          'name': userName,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+        
+        print('Profile created successfully');
+      } else {
+        print('User profile found in database');
+        final userData = Map<String, dynamic>.from(snapshot.value as Map);
+        userName = userData['name'] as String;
+        print('Username: $userName');
       }
 
       // Create user object
       final user = User(
-        id: userData['id']!,
+        id: firebaseUser.uid,
         email: email.toLowerCase(),
-        name: userData['name']!,
+        name: userName,
       );
 
+      print('Saving user session...');
+      
       // Save session
       await _saveUserSession(user);
 
+      print('=== SIGN IN SUCCESS ===');
       return user;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      print('FirebaseAuthException caught: ${e.code}');
+      print('Message: ${e.message}');
+      if (e.code == 'user-not-found') {
+        throw UserNotFoundException();
+      } else if (e.code == 'wrong-password') {
+        throw WrongPasswordException();
+      } else if (e.code == 'invalid-email') {
+        throw InvalidEmailException();
+      } else {
+        throw AuthException(e.message ?? 'Sign in failed.');
+      }
     } catch (e) {
+      print('Unexpected error caught: $e');
+      print('Error type: ${e.runtimeType}');
       rethrow;
     }
   }
@@ -248,8 +315,8 @@ class AuthService {
   /// Sign out the current user
   Future<void> signOut() async {
     try {
-      // Simulate API call to invalidate token
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Sign out from Firebase
+      await _auth.signOut();
 
       // Clear session data
       _currentUser = null;
@@ -293,5 +360,11 @@ class AuthService {
     } catch (e) {
       return false;
     }
+  }
+
+  /// Helper method to sanitize email for use as Firebase key
+  /// Firebase keys cannot contain: . $ # [ ] /
+  String _sanitizeEmail(String email) {
+    return email.toLowerCase().replaceAll('.', ',');
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/screens/sign_in.dart';
@@ -8,6 +10,11 @@ import 'package:mad_project/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   
   // Initialize auth service
   final authService = AuthService();
