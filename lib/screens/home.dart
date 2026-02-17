@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/screens/settings.dart';
+import 'package:mad_project/screens/category.dart';
+import 'package:mad_project/screens/profile.dart';
+import 'package:mad_project/services/database_service.dart';
+import 'package:mad_project/services/auth_service.dart';
+import 'package:mad_project/models/video.dart';
+import 'package:mad_project/screens/video_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -17,6 +23,29 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final DatabaseService _databaseService = DatabaseService();
+  final AuthService _authService = AuthService();
+  List<Video> _featuredVideos = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeaturedVideos();
+  }
+
+  Future<void> _loadFeaturedVideos() async {
+    setState(() => _isLoading = true);
+    
+    final videos = await _databaseService.getVideos(featured: true);
+    
+    if (mounted) {
+      setState(() {
+        _featuredVideos = videos;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,20 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(onSignOut: widget.onSignOut),
-                ),
-              );
-            },
-            tooltip: 'Settings',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -54,38 +69,45 @@ class _HomeScreenState extends State<HomeScreen> {
             // Header Section
             _buildHeaderSection(),
 
-            // Content will be added here when integrated with backend
+            // Featured Videos Section
             const SizedBox(height: AppConstants.spacingLarge),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppConstants.spacingLarge),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.video_library_outlined,
-                      size: 80,
-                      color: AppTheme.textTertiary,
-                    ),
-                    const SizedBox(height: AppConstants.spacingMedium),
-                    Text(
-                      'No content available',
-                      style: AppTheme.headlineMedium.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Content will appear here once connected to the backend',
-                      style: AppTheme.bodyMedium.copyWith(
-                        color: AppTheme.textTertiary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.spacingLarge,
+              ),
+              child: Text(
+                'Featured Videos',
+                style: AppTheme.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+            const SizedBox(height: AppConstants.spacingMedium),
+            
+            // Loading or Content
+            _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(AppConstants.spacingXLarge),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _featuredVideos.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppConstants.spacingLarge,
+                        ),
+                        itemCount: _featuredVideos.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppConstants.spacingMedium,
+                            ),
+                            child: _buildVideoCard(_featuredVideos[index]),
+                          );
+                        },
+                      ),
             const SizedBox(height: AppConstants.spacingLarge),
           ],
         ),
@@ -103,8 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Categories',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
@@ -168,6 +190,137 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.spacingXLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.video_library_outlined,
+              size: 80,
+              color: AppTheme.textTertiary,
+            ),
+            const SizedBox(height: AppConstants.spacingMedium),
+            Text(
+              'No videos available',
+              style: AppTheme.headlineMedium.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Featured videos will appear here',
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textTertiary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoCard(Video video) {
+    return GestureDetector(
+      onTap: () {
+        final user = _authService.currentUser;
+        if (user != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPlayerScreen(
+                video: video,
+                userId: user.id,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please sign in to watch videos'),
+              duration: Duration(milliseconds: 1500),
+            ),
+          );
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Thumbnail
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(AppConstants.radiusMedium),
+                  topRight: Radius.circular(AppConstants.radiusMedium),
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.play_circle_outline,
+                  size: 60,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ),
+            // Video Info
+            Padding(
+              padding: const EdgeInsets.all(AppConstants.spacingMedium),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    video.title,
+                    style: AppTheme.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    video.description,
+                    style: AppTheme.bodySmall.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: AppTheme.textTertiary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        video.getFormattedDuration(),
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
 
 
@@ -175,29 +328,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   void _handleBottomNavigation(int index) {
-    String message;
     switch (index) {
       case 0:
-        message = 'Home';
+        // Already on Home
         break;
       case 1:
-        message = 'Categories';
+        // Navigate to Categories
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CategoriesScreen(),
+          ),
+        );
         break;
       case 2:
-        message = 'Search';
+        // Navigate to Settings
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SettingsScreen(onSignOut: widget.onSignOut),
+          ),
+        );
         break;
       case 3:
-        message = 'Profile';
+        // Navigate to Profile
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfileScreen(onSignOut: widget.onSignOut),
+          ),
+        );
         break;
-      default:
-        message = 'Navigation';
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$message section tapped!'),
-        duration: const Duration(milliseconds: 800),
-      ),
-    );
   }
 }
