@@ -36,9 +36,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      // Initialize video player with HLS stream
+      // Fix S3 URLs: replace '+' with '%20' for proper space encoding in paths
+      final fixedUrl = widget.video.videoUrl.replaceAll('+', '%20');
+
+      // Initialize video player with the video URL
       _videoPlayerController = VideoPlayerController.networkUrl(
-        Uri.parse(widget.video.videoUrl),
+        Uri.parse(fixedUrl),
+        httpHeaders: const {
+          'Accept': '*/*',
+        },
       );
 
       await _videoPlayerController.initialize();
@@ -52,10 +58,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         allowMuting: true,
         showControls: true,
         placeholder: Container(
-          color: Colors.black,
-          child: const Center(
+          color: AppTheme.primaryDark,
+          child: Center(
             child: CircularProgressIndicator(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
           ),
         ),
@@ -64,20 +70,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   size: 60,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Error playing video',
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                  style: AppTheme.headlineSmall.copyWith(color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   errorMessage,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -157,20 +163,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.primaryDark,
       appBar: _chewieController != null && !_chewieController!.isFullScreen
           ? AppBar(
-              backgroundColor: Colors.black,
+              backgroundColor: AppTheme.primaryDark,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               title: Text(
                 widget.video.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+                style: AppTheme.titleMedium.copyWith(
+                  color: AppTheme.textPrimary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -178,8 +183,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             )
           : null,
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.white),
+          ? Center(
+              child: CircularProgressIndicator(color: AppTheme.textPrimary),
             )
           : _errorMessage != null
               ? _buildErrorWidget()
@@ -190,7 +195,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       aspectRatio: 16 / 9,
                       child: _chewieController != null
                           ? Chewie(controller: _chewieController!)
-                          : Container(color: Colors.black),
+                          : Container(color: AppTheme.primaryDark),
                     ),
                     // Video Info
                     Expanded(
@@ -203,9 +208,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             children: [
                               Text(
                                 widget.video.title,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+                                style: AppTheme.headlineMedium.copyWith(
+                                  color: AppTheme.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -229,9 +233,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 'Description',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                                style: AppTheme.titleMedium.copyWith(
+                                  color: AppTheme.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -260,26 +263,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               size: 80,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Failed to load video',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
+              style: AppTheme.headlineMedium.copyWith(
+                color: AppTheme.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'Unknown error',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -295,8 +295,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: AppTheme.textPrimary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,

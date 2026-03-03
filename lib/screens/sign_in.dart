@@ -414,7 +414,7 @@ class LogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final redCirclePaint = Paint()
-      ..color = const Color(0xFFFF4757)
+      ..color = AppTheme.accentColor
       ..style = PaintingStyle.fill;
 
     final whitePaint = Paint()

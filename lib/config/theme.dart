@@ -346,6 +346,21 @@ class AppTheme {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       elevation: 6,
     ),
+
+    // Bottom Sheet Theme
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: surfaceColor,
+      modalBackgroundColor: surfaceColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+    ),
+
+    // ListTile Theme (used by Chewie bottom sheet options)
+    listTileTheme: ListTileThemeData(
+      textColor: textPrimary,
+      iconColor: textPrimary,
+    ),
   );
 
   // ================= 🌙 DARK THEME =================
@@ -539,6 +554,15 @@ class AppTheme {
       contentTextStyle: bodyMedium.copyWith(color: Colors.white),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       elevation: 6,
+    ),
+
+    // Bottom Sheet Theme
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: primaryLight,
+      modalBackgroundColor: primaryLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
     ),
   );
 

@@ -8,6 +8,7 @@ import 'package:mad_project/services/database_service.dart';
 import 'package:mad_project/services/auth_service.dart';
 import 'package:mad_project/models/video.dart';
 import 'package:mad_project/screens/video_player_screen.dart';
+import 'package:mad_project/screens/admin_upload_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -25,23 +26,23 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
-  List<Video> _featuredVideos = [];
+  List<Video> _allVideos = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadFeaturedVideos();
+    _loadVideos();
   }
 
-  Future<void> _loadFeaturedVideos() async {
+  Future<void> _loadVideos() async {
     setState(() => _isLoading = true);
     
-    final videos = await _databaseService.getVideos(featured: true);
+    final videos = await _databaseService.getVideos();
     
     if (mounted) {
       setState(() {
-        _featuredVideos = videos;
+        _allVideos = videos;
         _isLoading = false;
       });
     }
@@ -62,6 +63,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      // ── Admin FAB — only visible to admin users ──────────────────────────
+      floatingActionButton: _authService.isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AdminUploadScreen(
+                      authService: _authService,
+                    ),
+                  ),
+                ).then((_) => _loadVideos());
+              },
+              backgroundColor: AppTheme.accentColor,
+              icon: const Icon(Icons.video_call, color: Colors.white),
+              label: const Text(
+                'Upload Video',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 horizontal: AppConstants.spacingLarge,
               ),
               child: Text(
-                'Featured Videos',
+                'All Videos',
                 style: AppTheme.headlineMedium.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -90,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: EdgeInsets.all(AppConstants.spacingXLarge),
                     child: Center(child: CircularProgressIndicator()),
                   )
-                : _featuredVideos.isEmpty
+                : _allVideos.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                         shrinkWrap: true,
@@ -98,13 +120,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppConstants.spacingLarge,
                         ),
-                        itemCount: _featuredVideos.length,
+                        itemCount: _allVideos.length,
                         itemBuilder: (context, index) {
                           return Padding(
                             padding: const EdgeInsets.only(
                               bottom: AppConstants.spacingMedium,
                             ),
-                            child: _buildVideoCard(_featuredVideos[index]),
+                            child: _buildVideoCard(_allVideos[index]),
                           );
                         },
                       ),
@@ -211,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Featured videos will appear here',
+              'Upload videos to see them here',
               style: AppTheme.bodyMedium.copyWith(
                 color: AppTheme.textTertiary,
               ),
@@ -256,20 +278,38 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Thumbnail
-            Container(
-              height: 180,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppConstants.radiusMedium),
-                  topRight: Radius.circular(AppConstants.radiusMedium),
-                ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppConstants.radiusMedium),
+                topRight: Radius.circular(AppConstants.radiusMedium),
               ),
-              child: Center(
-                child: Icon(
-                  Icons.play_circle_outline,
-                  size: 60,
-                  color: AppTheme.primaryColor,
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: Image.network(
+                  video.thumbnailUrl.replaceAll('+', '%20'),
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      child: Center(
+                        child: Icon(
+                          Icons.play_circle_outline,
+                          size: 60,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

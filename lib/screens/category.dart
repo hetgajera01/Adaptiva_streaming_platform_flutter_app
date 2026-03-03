@@ -3,6 +3,7 @@ import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/services/database_service.dart';
 import 'package:mad_project/models/category.dart';
+import 'package:mad_project/screens/category_videos_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -107,11 +108,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${category.name} content coming soon!'),
-            duration: const Duration(milliseconds: 1500),
-            backgroundColor: AppTheme.primaryColor,
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CategoryVideosScreen(category: category),
           ),
         );
       },

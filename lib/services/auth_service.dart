@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:convert';
 
@@ -43,13 +43,18 @@ class User {
   final String email;
   final String name;
   final String? profileImageUrl;
+  final String role; // "user" | "admin"
 
   User({
     required this.id,
     required this.email,
     required this.name,
     this.profileImageUrl,
+    this.role = 'user',
   });
+
+  /// Whether this user has admin privileges
+  bool get isAdmin => role == 'admin';
 
   /// Convert User to JSON for storage
   Map<String, dynamic> toJson() {
@@ -58,6 +63,7 @@ class User {
       'email': email,
       'name': name,
       'profileImageUrl': profileImageUrl,
+      'role': role,
     };
   }
 
@@ -68,6 +74,7 @@ class User {
       email: json['email'] as String,
       name: json['name'] as String,
       profileImageUrl: json['profileImageUrl'] as String?,
+      role: json['role'] as String? ?? 'user',
     );
   }
 }
@@ -84,9 +91,9 @@ class AuthService {
 
   late SharedPreferences _prefs;
   User? _currentUser;
-  late DatabaseReference _database;
+  late FirebaseFirestore _firestore;
   late firebase_auth.FirebaseAuth _auth;
-  
+
   static const String _userKey = 'current_user';
   static const String _isLoggedInKey = 'is_logged_in';
   static const String _sessionTokenKey = 'session_token';
@@ -94,7 +101,7 @@ class AuthService {
   /// Initialize the auth service
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
-    _database = FirebaseDatabase.instance.ref();
+    _firestore = FirebaseFirestore.instance;
     _auth = firebase_auth.FirebaseAuth.instance;
     await _restoreSession();
   }
@@ -117,6 +124,9 @@ class AuthService {
   /// Check if user is logged in
   bool get isLoggedIn => _currentUser != null;
 
+  /// Check if current user is an admin
+  bool get isAdmin => _currentUser?.isAdmin ?? false;
+
   /// Get current user
   User? get currentUser => _currentUser;
 
@@ -126,28 +136,24 @@ class AuthService {
     return emailRegex.hasMatch(email);
   }
 
-  /// Validate password strength (basic check, Firebase will enforce its own rules)
+  /// Validate password strength
   bool _isValidPassword(String password) {
-    // At least 6 characters
     return password.length >= 6;
   }
 
-  /// Register a new user with Firebase Authentication
+  /// Register a new user with Firebase Authentication + Firestore
   Future<User> register({
     required String email,
     required String password,
     required String name,
   }) async {
     try {
-      // Validate inputs
       if (email.isEmpty || !_isValidEmail(email)) {
         throw InvalidEmailException();
       }
-
       if (password.isEmpty || !_isValidPassword(password)) {
         throw WeakPasswordException();
       }
-
       if (name.isEmpty) {
         throw AuthException('Please enter your name.');
       }
@@ -170,17 +176,19 @@ class AuthService {
         name: name,
       );
 
-      // Save user profile data to Realtime Database (NOT password)
-      await _database.child('users').child(firebaseUser.uid).set({
-        'id': firebaseUser.uid,
+      // Save user profile to Firestore users/{uid}
+      await _firestore.collection('users').doc(firebaseUser.uid).set({
+        'uid': firebaseUser.uid,
         'email': email.toLowerCase(),
         'name': name,
-        'createdAt': DateTime.now().toIso8601String(),
+        'role': 'user',
+        'profileImageUrl': null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLoginAt': FieldValue.serverTimestamp(),
+        'isActive': true,
       });
 
-      // Save to local storage
       await _saveUserSession(newUser);
-
       return newUser;
     } on firebase_auth.FirebaseAuthException catch (e) {
       if (e.code == 'weak-password') {
@@ -197,7 +205,7 @@ class AuthService {
     }
   }
 
-  /// Sign in with Firebase Authentication
+  /// Sign in with Firebase Authentication + Firestore profile lookup
   Future<User> signIn({
     required String email,
     required String password,
@@ -205,84 +213,72 @@ class AuthService {
     try {
       print('=== SIGN IN START ===');
       print('Email: $email');
-      
-      // Validate inputs
+
       if (email.isEmpty || !_isValidEmail(email)) {
-        print('Invalid email format');
         throw InvalidEmailException();
       }
-
       if (password.isEmpty) {
-        print('Password is empty');
         throw AuthException('Please enter your password.');
       }
 
-      print('Calling Firebase signInWithEmailAndPassword...');
-      
-      // Sign in with Firebase Authentication
       final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      print('Firebase authentication successful');
-      
       final firebaseUser = credential.user;
       if (firebaseUser == null) {
-        print('Firebase user is null');
         throw AuthException('Sign in failed.');
       }
 
       print('Firebase UID: ${firebaseUser.uid}');
-      print('Checking Realtime Database for user profile...');
-      
-      // Get user profile data from Realtime Database
-      final snapshot = await _database.child('users').child(firebaseUser.uid).get();
-      
+
+      // Get user profile from Firestore
+      final docSnapshot = await _firestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
+
       String userName;
-      
-      if (!snapshot.exists) {
-        print('User profile not found in database, creating new profile...');
-        // User exists in Firebase Auth but not in Realtime Database
-        // This can happen if the user was created directly in Firebase Console
-        // or if there was an issue during registration
-        // Create a basic profile for them
+      String userRole = 'user';
+
+      if (!docSnapshot.exists) {
+        // Profile missing — create a basic one
         userName = firebaseUser.email?.split('@')[0] ?? 'User';
-        
-        print('Creating profile with username: $userName');
-        
-        await _database.child('users').child(firebaseUser.uid).set({
-          'id': firebaseUser.uid,
+        await _firestore.collection('users').doc(firebaseUser.uid).set({
+          'uid': firebaseUser.uid,
           'email': email.toLowerCase(),
           'name': userName,
-          'createdAt': DateTime.now().toIso8601String(),
+          'role': 'user',
+          'profileImageUrl': null,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+          'isActive': true,
         });
-        
-        print('Profile created successfully');
       } else {
-        print('User profile found in database');
-        final userData = Map<String, dynamic>.from(snapshot.value as Map);
-        userName = userData['name'] as String;
-        print('Username: $userName');
+        final data = docSnapshot.data()!;
+        userName = data['name'] as String;
+        userRole = data['role'] as String? ?? 'user';
+
+        // Update lastLoginAt timestamp
+        await _firestore
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .update({'lastLoginAt': FieldValue.serverTimestamp()});
       }
 
-      // Create user object
       final user = User(
         id: firebaseUser.uid,
         email: email.toLowerCase(),
         name: userName,
+        role: userRole,
       );
 
-      print('Saving user session...');
-      
-      // Save session
       await _saveUserSession(user);
-
       print('=== SIGN IN SUCCESS ===');
       return user;
     } on firebase_auth.FirebaseAuthException catch (e) {
-      print('FirebaseAuthException caught: ${e.code}');
-      print('Message: ${e.message}');
+      print('FirebaseAuthException: ${e.code} — ${e.message}');
       if (e.code == 'user-not-found') {
         throw UserNotFoundException();
       } else if (e.code == 'wrong-password') {
@@ -293,8 +289,7 @@ class AuthService {
         throw AuthException(e.message ?? 'Sign in failed.');
       }
     } catch (e) {
-      print('Unexpected error caught: $e');
-      print('Error type: ${e.runtimeType}');
+      print('Unexpected error: $e');
       rethrow;
     }
   }
@@ -305,8 +300,8 @@ class AuthService {
       _currentUser = user;
       await _prefs.setBool(_isLoggedInKey, true);
       await _prefs.setString(_userKey, jsonEncode(user.toJson()));
-      // In production, generate and store actual JWT token
-      await _prefs.setString(_sessionTokenKey, 'session_${user.id}_${DateTime.now().millisecondsSinceEpoch}');
+      await _prefs.setString(
+          _sessionTokenKey, 'session_${user.id}_${DateTime.now().millisecondsSinceEpoch}');
     } catch (e) {
       throw AuthException('Failed to save session: $e');
     }
@@ -315,10 +310,7 @@ class AuthService {
   /// Sign out the current user
   Future<void> signOut() async {
     try {
-      // Sign out from Firebase
       await _auth.signOut();
-
-      // Clear session data
       _currentUser = null;
       await _prefs.remove(_isLoggedInKey);
       await _prefs.remove(_userKey);
@@ -328,7 +320,7 @@ class AuthService {
     }
   }
 
-  /// Update user profile
+  /// Update user profile (local + Firestore)
   Future<User> updateProfile({
     required String name,
     String? profileImageUrl,
@@ -345,6 +337,12 @@ class AuthService {
         profileImageUrl: profileImageUrl,
       );
 
+      // Update Firestore document
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'name': name,
+        if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
+      });
+
       await _saveUserSession(updatedUser);
       return updatedUser;
     } catch (e) {
@@ -352,7 +350,7 @@ class AuthService {
     }
   }
 
-  /// Check if session is valid (can be extended with token validation)
+  /// Check if session is valid
   Future<bool> isSessionValid() async {
     try {
       final sessionToken = _prefs.getString(_sessionTokenKey);
@@ -360,11 +358,5 @@ class AuthService {
     } catch (e) {
       return false;
     }
-  }
-
-  /// Helper method to sanitize email for use as Firebase key
-  /// Firebase keys cannot contain: . $ # [ ] /
-  String _sanitizeEmail(String email) {
-    return email.toLowerCase().replaceAll('.', ',');
   }
 }
