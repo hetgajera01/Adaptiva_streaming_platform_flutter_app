@@ -3,6 +3,7 @@ import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/models/category.dart';
 import 'package:mad_project/services/auth_service.dart';
 import 'package:mad_project/services/database_service.dart';
+import 'package:mad_project/screens/admin_video_list_screen.dart';
 
 class AdminUploadScreen extends StatefulWidget {
   final AuthService authService;
@@ -242,6 +243,22 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
           ],
         ),
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AdminVideoListScreen(
+                    authService: widget.authService,
+                  ),
+                ),
+              );
+            },
+            icon: Icon(Icons.video_settings, color: AppTheme.accentColor),
+            tooltip: 'Manage Videos',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

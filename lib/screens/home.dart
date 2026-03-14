@@ -9,6 +9,7 @@ import 'package:mad_project/services/auth_service.dart';
 import 'package:mad_project/models/video.dart';
 import 'package:mad_project/screens/video_player_screen.dart';
 import 'package:mad_project/screens/admin_upload_screen.dart';
+import 'package:mad_project/screens/admin_edit_video_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -245,6 +246,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _confirmDeleteVideo(Video video) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.errorColor),
+            const SizedBox(width: 10),
+            Text('Delete Video',
+                style: TextStyle(color: AppTheme.textPrimary, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'Delete "${video.title}"?\nThis action cannot be undone.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _databaseService.deleteVideo(video.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ "${video.title}" deleted'),
+              backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          _loadVideos();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildVideoCard(Video video) {
     return GestureDetector(
       onTap: () {
@@ -351,6 +415,35 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: AppTheme.textTertiary,
                         ),
                       ),
+                      const Spacer(),
+                      // ── Admin Actions ──
+                      if (_authService.isAdmin) ...[
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminEditVideoScreen(
+                                  authService: _authService,
+                                  video: video,
+                                ),
+                              ),
+                            ).then((_) => _loadVideos());
+                          },
+                          icon: Icon(Icons.edit, color: AppTheme.infoColor, size: 20),
+                          tooltip: 'Edit',
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: () => _confirmDeleteVideo(video),
+                          icon: Icon(Icons.delete_outline, color: AppTheme.errorColor, size: 20),
+                          tooltip: 'Delete',
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                      ],
                     ],
                   ),
                 ],
