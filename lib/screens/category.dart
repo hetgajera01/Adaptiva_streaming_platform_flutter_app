@@ -4,6 +4,7 @@ import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/services/database_service.dart';
 import 'package:mad_project/models/category.dart';
 import 'package:mad_project/screens/category_videos_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -16,6 +17,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   final DatabaseService _databaseService = DatabaseService();
   List<Category> _categories = [];
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -24,15 +27,42 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _loadCategories() async {
-    setState(() => _isLoading = true);
-    
-    final categories = await _databaseService.getCategories();
-    
-    if (mounted) {
-      setState(() {
-        _categories = categories;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = '';
+    });
+
+    try {
+      // Check internet connectivity
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+            _errorMessage = 'No internet connection';
+          });
+        }
+        return;
+      }
+
+      final categories = await _databaseService.getCategories();
+
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Unable to fetch data';
+        });
+      }
     }
   }
 
@@ -53,8 +83,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _categories.isEmpty
-              ? _buildEmptyState()
+          : _hasError
+              ? _buildErrorState()
+              : _categories.isEmpty
+                  ? _buildEmptyState()
               : Padding(
                   padding: const EdgeInsets.all(AppConstants.spacingMedium),
                   child: GridView.count(
@@ -91,6 +123,53 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             'Categories will appear here once added',
             style: AppTheme.bodyMedium.copyWith(
               color: AppTheme.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final isNoInternet = _errorMessage.contains('No internet');
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isNoInternet ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+            size: 80,
+            color: AppTheme.errorColor,
+          ),
+          const SizedBox(height: AppConstants.spacingMedium),
+          Text(
+            _errorMessage,
+            style: AppTheme.headlineMedium.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isNoInternet
+                ? 'Please check your connection and try again'
+                : 'Something went wrong while loading categories',
+            style: AppTheme.bodyMedium.copyWith(
+              color: AppTheme.textTertiary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppConstants.spacingLarge),
+          ElevatedButton.icon(
+            onPressed: _loadCategories,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            label: const Text('Retry', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+              ),
             ),
           ),
         ],

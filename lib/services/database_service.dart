@@ -279,7 +279,7 @@ class DatabaseService {
     }
   }
 
-  /// [ADMIN ONLY] Soft-delete a video (sets isActive = false).
+  /// [ADMIN ONLY] Permanently delete a video from Firestore.
   /// Also decrements the category's videoCount.
   Future<void> deleteVideo(String videoId) async {
     try {
@@ -288,11 +288,10 @@ class DatabaseService {
 
       final categoryId = doc.data()?['categoryId'] as String?;
 
-      await _firestore.collection('videos').doc(videoId).update({
-        'isActive': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // Permanently remove the video document from Firestore
+      await _firestore.collection('videos').doc(videoId).delete();
 
+      // Decrement the category's video count
       if (categoryId != null) {
         await _firestore
             .collection('categories')
@@ -300,7 +299,7 @@ class DatabaseService {
             .update({'videoCount': FieldValue.increment(-1)});
       }
 
-      print('Video $videoId soft-deleted.');
+      print('Video $videoId permanently deleted from database.');
     } catch (e) {
       print('Error deleting video: $e');
       rethrow;

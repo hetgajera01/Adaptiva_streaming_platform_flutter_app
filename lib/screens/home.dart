@@ -10,6 +10,7 @@ import 'package:mad_project/models/video.dart';
 import 'package:mad_project/screens/video_player_screen.dart';
 import 'package:mad_project/screens/admin_upload_screen.dart';
 import 'package:mad_project/screens/admin_edit_video_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -28,24 +29,82 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
   List<Video> _allVideos = [];
+  List<Video> _filteredVideos = [];
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadVideos();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _filterVideos(_searchController.text);
+  }
+
+  void _filterVideos(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredVideos = _allVideos;
+      } else {
+        _filteredVideos = _allVideos
+            .where((video) =>
+                video.title.toLowerCase().contains(query.toLowerCase()) ||
+                video.description.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
   }
 
   Future<void> _loadVideos() async {
-    setState(() => _isLoading = true);
-    
-    final videos = await _databaseService.getVideos();
-    
-    if (mounted) {
-      setState(() {
-        _allVideos = videos;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = '';
+    });
+
+    try {
+      // Check internet connectivity
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+            _errorMessage = 'No internet connection';
+          });
+        }
+        return;
+      }
+
+      final videos = await _databaseService.getVideos();
+
+      if (mounted) {
+        setState(() {
+          _allVideos = videos;
+          _filteredVideos = videos; // Initialize filtered videos
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Unable to fetch data';
+        });
+      }
     }
   }
 
@@ -107,30 +166,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppConstants.spacingMedium),
             
-            // Loading or Content
+            // Loading, Error, or Content
             _isLoading
                 ? const Padding(
                     padding: EdgeInsets.all(AppConstants.spacingXLarge),
                     child: Center(child: CircularProgressIndicator()),
                   )
-                : _allVideos.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.spacingLarge,
-                        ),
-                        itemCount: _allVideos.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppConstants.spacingMedium,
-                            ),
-                            child: _buildVideoCard(_allVideos[index]),
-                          );
-                        },
-                      ),
+                : _hasError
+                    ? _buildErrorState()
+                    : _buildSearchResults(),
             const SizedBox(height: AppConstants.spacingLarge),
           ],
         ),
@@ -189,12 +233,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Search Bar
           TextField(
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search content...',
               hintStyle: AppTheme.bodyMedium.copyWith(
                 color: AppTheme.textTertiary,
               ),
               prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppTheme.textSecondary),
+                      onPressed: () {
+                        _searchController.clear();
+                        _filterVideos('');
+                      },
+                    )
+                  : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                 borderSide: const BorderSide(color: AppTheme.dividerColor),
@@ -209,6 +263,57 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_filteredVideos.isEmpty && _searchController.text.isNotEmpty) {
+      return _buildNoSearchResultsState();
+    }
+    
+    if (_allVideos.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingLarge),
+      itemCount: _filteredVideos.length,
+      itemBuilder: (context, index) => _buildVideoCard(_filteredVideos[index]),
+    );
+  }
+
+  Widget _buildNoSearchResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.spacingXLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 80,
+              color: AppTheme.textTertiary,
+            ),
+            const SizedBox(height: AppConstants.spacingMedium),
+            Text(
+              'No results found',
+              style: AppTheme.headlineMedium.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try searching for something else',
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textTertiary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,6 +344,56 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppTheme.textTertiary,
               ),
               textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final isNoInternet = _errorMessage.contains('No internet');
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.spacingXLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isNoInternet ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+              size: 80,
+              color: AppTheme.errorColor,
+            ),
+            const SizedBox(height: AppConstants.spacingMedium),
+            Text(
+              _errorMessage,
+              style: AppTheme.headlineMedium.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isNoInternet
+                  ? 'Please check your connection and try again'
+                  : 'Something went wrong while loading videos',
+              style: AppTheme.bodyMedium.copyWith(
+                color: AppTheme.textTertiary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppConstants.spacingLarge),
+            ElevatedButton.icon(
+              onPressed: _loadVideos,
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text('Retry', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                ),
+              ),
             ),
           ],
         ),

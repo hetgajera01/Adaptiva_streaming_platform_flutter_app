@@ -6,6 +6,7 @@ import 'package:mad_project/models/video.dart';
 import 'package:mad_project/services/database_service.dart';
 import 'package:mad_project/screens/video_player_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CategoryVideosScreen extends StatefulWidget {
   final cat_model.Category category;
@@ -20,6 +21,8 @@ class _CategoryVideosScreenState extends State<CategoryVideosScreen> {
   final DatabaseService _databaseService = DatabaseService();
   List<Video> _videos = [];
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -28,17 +31,44 @@ class _CategoryVideosScreenState extends State<CategoryVideosScreen> {
   }
 
   Future<void> _loadVideos() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = '';
+    });
 
-    final videos = await _databaseService.getVideos(
-      categoryId: widget.category.id,
-    );
+    try {
+      // Check internet connectivity
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+            _errorMessage = 'No internet connection';
+          });
+        }
+        return;
+      }
 
-    if (mounted) {
-      setState(() {
-        _videos = videos;
-        _isLoading = false;
-      });
+      final videos = await _databaseService.getVideos(
+        categoryId: widget.category.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _videos = videos;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Unable to fetch data';
+        });
+      }
     }
   }
 
@@ -62,8 +92,10 @@ class _CategoryVideosScreenState extends State<CategoryVideosScreen> {
           ? Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             )
-          : _videos.isEmpty
-              ? _buildEmptyState()
+          : _hasError
+              ? _buildErrorState()
+              : _videos.isEmpty
+                  ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _loadVideos,
                   color: AppTheme.accentColor,
@@ -101,6 +133,53 @@ class _CategoryVideosScreenState extends State<CategoryVideosScreen> {
               color: AppTheme.textTertiary,
             ),
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final isNoInternet = _errorMessage.contains('No internet');
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isNoInternet ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+            size: 80,
+            color: AppTheme.errorColor,
+          ),
+          const SizedBox(height: AppConstants.spacingMedium),
+          Text(
+            _errorMessage,
+            style: AppTheme.headlineMedium.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isNoInternet
+                ? 'Please check your connection and try again'
+                : 'Something went wrong while loading videos',
+            style: AppTheme.bodyMedium.copyWith(
+              color: AppTheme.textTertiary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppConstants.spacingLarge),
+          ElevatedButton.icon(
+            onPressed: _loadVideos,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            label: const Text('Retry', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+              ),
+            ),
           ),
         ],
       ),
