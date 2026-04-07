@@ -7,6 +7,7 @@ import 'package:mad_project/screens/sign_in.dart';
 import 'package:mad_project/screens/sign_up.dart';
 import 'package:mad_project/screens/home.dart';
 import 'package:mad_project/services/auth_service.dart';
+import 'package:mad_project/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,10 @@ void main() async {
   // Initialize auth service
   final authService = AuthService();
   await authService.initialize();
+
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
   
   runApp(MyApp(authService: authService));
 }
@@ -34,7 +39,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   bool _isSignedIn = false;
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -55,7 +59,7 @@ class _MyAppState extends State<MyApp> {
   void _handleSignOut() {
     widget.authService.signOut().then((_) {
       setState(() => _isSignedIn = false);
-      _navigatorKey.currentState?.pushAndRemoveUntil(
+      NotificationService.navigatorKey.currentState?.pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (context) => SignInScreen(
             authService: widget.authService,
@@ -69,15 +73,15 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _navigateToSignUp() {
-    _navigatorKey.currentState?.push(
+    NotificationService.navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) => SignUpScreen(
           authService: widget.authService,
           onSignUpSuccess: () {
-            _navigatorKey.currentState?.pop();
+            NotificationService.navigatorKey.currentState?.pop();
             _handleSignIn();
           },
-          onNavigateToSignIn: () => _navigatorKey.currentState?.pop(),
+          onNavigateToSignIn: () => NotificationService.navigatorKey.currentState?.pop(),
         ),
       ),
     );
@@ -87,7 +91,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      navigatorKey: _navigatorKey,
+      navigatorKey: NotificationService.navigatorKey,
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

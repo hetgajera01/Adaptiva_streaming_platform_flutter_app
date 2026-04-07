@@ -2,7 +2,7 @@
 class AppConstants {
   // ================= 🎨 BRANDING CONSTANTS =================
   static const String appName = 'PulseStream';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.1.0';
 
   // ================= 📐 SPACING & PADDING CONSTANTS =================
   static const double spacingXSmall = 4.0;

@@ -3,6 +3,7 @@ import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/models/category.dart';
 import 'package:mad_project/services/auth_service.dart';
 import 'package:mad_project/services/database_service.dart';
+import 'package:mad_project/services/notification_service.dart';
 import 'package:mad_project/screens/admin_video_list_screen.dart';
 
 class AdminUploadScreen extends StatefulWidget {
@@ -164,6 +165,14 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
 
       if (mounted) {
         _showSnack('✅ Video uploaded! ID: $videoId');
+
+        // Send local notification about the new video
+        NotificationService().showInstantNotification(
+          title: 'New Video Added 🎬',
+          body: '"${_titleCtrl.text}" is now available!',
+          payload: '{"type": "video", "videoId": "$videoId"}',
+        );
+
         _formKey.currentState!.reset();
         _titleCtrl.clear();
         _descCtrl.clear();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
 import 'package:mad_project/services/auth_service.dart';
+import 'package:mad_project/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -249,6 +250,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         setState(() => _notificationsEnabled = value);
                         _saveSettings();
                       },
+                    ),
+                    _buildDivider(),
+                    _buildSettingTile(
+                      icon: Icons.notifications_active,
+                      title: 'Send Test Notification',
+                      subtitle: 'Trigger an instant notification now',
+                      onTap: () {
+                        NotificationService().showInstantNotification(
+                          title: 'Test Notification 🔔',
+                          body: 'This is a test notification from Adaptiva!',
+                          payload: '{"type": "test"}',
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Test notification sent!'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      trailing: const Icon(Icons.send, color: AppTheme.textTertiary),
+                    ),
+                    _buildDivider(),
+                    _buildSettingTile(
+                      icon: Icons.schedule,
+                      title: 'Schedule Reminder (10 sec)',
+                      subtitle: 'A notification will appear in 10 seconds',
+                      onTap: () {
+                        NotificationService().scheduleNotification(
+                          id: 100,
+                          title: 'Scheduled Reminder ⏰',
+                          body: 'This reminder was scheduled 10 seconds ago!',
+                          scheduledTime: DateTime.now().add(const Duration(seconds: 10)),
+                          payload: '{"type": "reminder"}',
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Reminder scheduled for 10 seconds from now!'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      trailing: const Icon(Icons.timer, color: AppTheme.textTertiary),
                     ),
                   ]),
 
