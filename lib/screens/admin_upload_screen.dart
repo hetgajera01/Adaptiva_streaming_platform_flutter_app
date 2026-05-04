@@ -24,6 +24,8 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
   final _descCtrl = TextEditingController();
   final _thumbnailCtrl = TextEditingController();
   final _videoUrlCtrl = TextEditingController();
+  final _hlsUrlCtrl = TextEditingController();
+  final _qualitiesCtrl = TextEditingController();
 
   String? _selectedCategoryId;
   bool _isLoading = false;
@@ -41,6 +43,8 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
     _descCtrl.dispose();
     _thumbnailCtrl.dispose();
     _videoUrlCtrl.dispose();
+    _hlsUrlCtrl.dispose();
+    _qualitiesCtrl.dispose();
     super.dispose();
   }
 
@@ -153,12 +157,20 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
     try {
       final adminUid = widget.authService.currentUser!.id;
 
+      // Parse qualities from comma-separated text
+      final qualitiesText = _qualitiesCtrl.text.trim();
+      final qualities = qualitiesText.isNotEmpty
+          ? qualitiesText.split(',').map((q) => q.trim()).where((q) => q.isNotEmpty).toList()
+          : <String>[];
+
       final videoId = await _db.addVideo(
         title: _titleCtrl.text,
         description: _descCtrl.text,
         categoryId: _selectedCategoryId!,
         thumbnailUrl: _thumbnailCtrl.text,
         videoUrl: _videoUrlCtrl.text,
+        hlsUrl: _hlsUrlCtrl.text.trim().isNotEmpty ? _hlsUrlCtrl.text.trim() : null,
+        qualities: qualities,
         duration: 0,
         adminUid: adminUid,
       );
@@ -178,6 +190,8 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
         _descCtrl.clear();
         _thumbnailCtrl.clear();
         _videoUrlCtrl.clear();
+        _hlsUrlCtrl.clear();
+        _qualitiesCtrl.clear();
         setState(() {
           _selectedCategoryId = null;
         });
@@ -322,16 +336,37 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Video URL
+              // Video URL (MP4 fallback)
               _buildField(
                 controller: _videoUrlCtrl,
-                label: 'Video URL',
+                label: 'Video URL (MP4)',
                 hint: 'https://cdn.example.com/video.mp4',
                 icon: Icons.video_library,
                 validator: (v) {
                   if (v!.trim().isEmpty) return 'Video URL is required';
                   return null;
                 },
+              ),
+              const SizedBox(height: 20),
+
+              _sectionLabel('Adaptive Streaming (Optional)'),
+              const SizedBox(height: 12),
+
+              // HLS URL
+              _buildField(
+                controller: _hlsUrlCtrl,
+                label: 'HLS URL (master.m3u8)',
+                hint: 'https://cdn.example.com/movie1/master.m3u8',
+                icon: Icons.stream,
+              ),
+              const SizedBox(height: 14),
+
+              // Qualities
+              _buildField(
+                controller: _qualitiesCtrl,
+                label: 'Available Qualities',
+                hint: '240p, 480p, 720p, 1080p',
+                icon: Icons.high_quality,
               ),
               const SizedBox(height: 32),
 

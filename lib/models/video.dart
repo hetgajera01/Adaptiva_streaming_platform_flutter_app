@@ -7,6 +7,8 @@ class Video {
   final String categoryId;
   final String thumbnailUrl;
   final String videoUrl;
+  final String? hlsUrl; // HLS master playlist URL (e.g., CloudFront .m3u8)
+  final List<String> qualities; // Available qualities ["240p","480p","720p","1080p"]
   final int duration; // in seconds
   final String createdAt;
   final bool featured;
@@ -22,6 +24,8 @@ class Video {
     required this.categoryId,
     required this.thumbnailUrl,
     required this.videoUrl,
+    this.hlsUrl,
+    this.qualities = const [],
     required this.duration,
     required this.createdAt,
     this.featured = false,
@@ -48,6 +52,12 @@ class Video {
         ? List<String>.from(rawTags as List)
         : [];
 
+    // qualities can be List<dynamic> from Firestore
+    final rawQualities = json['qualities'];
+    final List<String> qualitiesList = rawQualities != null
+        ? List<String>.from(rawQualities as List)
+        : [];
+
     return Video(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -55,6 +65,8 @@ class Video {
       categoryId: json['categoryId'] as String,
       thumbnailUrl: json['thumbnailUrl'] as String,
       videoUrl: json['videoUrl'] as String,
+      hlsUrl: json['hlsUrl'] as String?,
+      qualities: qualitiesList,
       duration: (json['duration'] as num).toInt(),
       createdAt: createdAtStr,
       featured: json['featured'] as bool? ?? false,
@@ -74,6 +86,8 @@ class Video {
       'categoryId': categoryId,
       'thumbnailUrl': thumbnailUrl,
       'videoUrl': videoUrl,
+      if (hlsUrl != null) 'hlsUrl': hlsUrl,
+      'qualities': qualities,
       'duration': duration,
       'createdAt': createdAt,
       'featured': featured,
@@ -83,6 +97,12 @@ class Video {
       if (addedBy != null) 'addedBy': addedBy,
     };
   }
+
+  /// Get the best playback URL — prefers HLS when available
+  String get playbackUrl => (hlsUrl != null && hlsUrl!.isNotEmpty) ? hlsUrl! : videoUrl;
+
+  /// Whether this video has an HLS stream
+  bool get isHls => hlsUrl != null && hlsUrl!.isNotEmpty;
 
   /// Get formatted duration (e.g., "1h 30m")
   String getFormattedDuration() {

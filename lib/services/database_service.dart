@@ -228,6 +228,8 @@ class DatabaseService {
     required String categoryId,
     required String thumbnailUrl,
     required String videoUrl,
+    String? hlsUrl,
+    List<String> qualities = const [],
     required int duration,
     required String adminUid,
     bool featured = false,
@@ -236,7 +238,7 @@ class DatabaseService {
     try {
       final docRef = _firestore.collection('videos').doc();
 
-      await docRef.set({
+      final data = <String, dynamic>{
         'id': docRef.id,
         'title': title.trim(),
         'description': description.trim(),
@@ -248,10 +250,18 @@ class DatabaseService {
         'isActive': true,
         'viewCount': 0,
         'tags': tags,
+        'qualities': qualities,
         'addedBy': adminUid,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      // Only include hlsUrl if provided
+      if (hlsUrl != null && hlsUrl.isNotEmpty) {
+        data['hlsUrl'] = hlsUrl.trim();
+      }
+
+      await docRef.set(data);
 
       // Increment videoCount on the category atomically
       await _firestore
@@ -304,5 +314,44 @@ class DatabaseService {
       print('Error deleting video: $e');
       rethrow;
     }
+  }
+
+  // ─── Notifications (Admin → All Users) ─────────────────────────────────────
+
+  /// [ADMIN ONLY] Send a notification to all users by writing to the
+  /// `notifications` collection. All clients listen to this collection
+  /// and display new entries as local notifications.
+  Future<String> sendNotificationToAll({
+    required String title,
+    required String body,
+    required String sentBy,
+    String? payload,
+  }) async {
+    try {
+      final docRef = _firestore.collection('notifications').doc();
+      await docRef.set({
+        'id': docRef.id,
+        'title': title.trim(),
+        'body': body.trim(),
+        'payload': payload,
+        'sentBy': sentBy,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      print('Notification sent to all users: ${docRef.id}');
+      return docRef.id;
+    } catch (e) {
+      print('Error sending notification: $e');
+      rethrow;
+    }
+  }
+
+  /// Returns a real-time stream of notifications ordered by creation time.
+  /// Used by all clients to listen for new admin notifications.
+  Stream<QuerySnapshot> getNotificationsStream() {
+    return _firestore
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots();
   }
 }

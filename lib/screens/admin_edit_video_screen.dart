@@ -27,6 +27,8 @@ class _AdminEditVideoScreenState extends State<AdminEditVideoScreen> {
   late final TextEditingController _descCtrl;
   late final TextEditingController _thumbnailCtrl;
   late final TextEditingController _videoUrlCtrl;
+  late final TextEditingController _hlsUrlCtrl;
+  late final TextEditingController _qualitiesCtrl;
 
   String? _selectedCategoryId;
   bool _isLoading = false;
@@ -39,6 +41,8 @@ class _AdminEditVideoScreenState extends State<AdminEditVideoScreen> {
     _descCtrl = TextEditingController(text: widget.video.description);
     _thumbnailCtrl = TextEditingController(text: widget.video.thumbnailUrl);
     _videoUrlCtrl = TextEditingController(text: widget.video.videoUrl);
+    _hlsUrlCtrl = TextEditingController(text: widget.video.hlsUrl ?? '');
+    _qualitiesCtrl = TextEditingController(text: widget.video.qualities.join(', '));
     _selectedCategoryId = widget.video.categoryId;
     _loadCategories();
   }
@@ -49,6 +53,8 @@ class _AdminEditVideoScreenState extends State<AdminEditVideoScreen> {
     _descCtrl.dispose();
     _thumbnailCtrl.dispose();
     _videoUrlCtrl.dispose();
+    _hlsUrlCtrl.dispose();
+    _qualitiesCtrl.dispose();
     super.dispose();
   }
 
@@ -85,6 +91,19 @@ class _AdminEditVideoScreenState extends State<AdminEditVideoScreen> {
       }
       if (_selectedCategoryId != widget.video.categoryId) {
         fields['categoryId'] = _selectedCategoryId;
+      }
+      // HLS URL
+      final newHlsUrl = _hlsUrlCtrl.text.trim();
+      final oldHlsUrl = widget.video.hlsUrl ?? '';
+      if (newHlsUrl != oldHlsUrl) {
+        fields['hlsUrl'] = newHlsUrl.isNotEmpty ? newHlsUrl : null;
+      }
+      // Qualities
+      final newQualities = _qualitiesCtrl.text.trim().isNotEmpty
+          ? _qualitiesCtrl.text.split(',').map((q) => q.trim()).where((q) => q.isNotEmpty).toList()
+          : <String>[];
+      if (newQualities.join(',') != widget.video.qualities.join(',')) {
+        fields['qualities'] = newQualities;
       }
 
       if (fields.isEmpty) {
@@ -216,13 +235,34 @@ class _AdminEditVideoScreenState extends State<AdminEditVideoScreen> {
               // Video URL
               _buildField(
                 controller: _videoUrlCtrl,
-                label: 'Video URL',
+                label: 'Video URL (MP4)',
                 hint: 'https://cdn.example.com/video.mp4',
                 icon: Icons.video_library,
                 validator: (v) {
                   if (v!.trim().isEmpty) return 'Video URL is required';
                   return null;
                 },
+              ),
+              const SizedBox(height: 20),
+
+              _sectionLabel('Adaptive Streaming (Optional)'),
+              const SizedBox(height: 12),
+
+              // HLS URL
+              _buildField(
+                controller: _hlsUrlCtrl,
+                label: 'HLS URL (master.m3u8)',
+                hint: 'https://cdn.example.com/movie1/master.m3u8',
+                icon: Icons.stream,
+              ),
+              const SizedBox(height: 14),
+
+              // Qualities
+              _buildField(
+                controller: _qualitiesCtrl,
+                label: 'Available Qualities',
+                hint: '240p, 480p, 720p, 1080p',
+                icon: Icons.high_quality,
               ),
               const SizedBox(height: 32),
 

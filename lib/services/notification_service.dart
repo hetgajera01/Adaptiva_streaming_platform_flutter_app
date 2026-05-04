@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
@@ -40,6 +43,9 @@ class NotificationService {
 
   // Stores the payload from a notification that launched the app.
   static String? _initialPayload;
+
+  // Firestore listener subscription
+  StreamSubscription<QuerySnapshot>? _notificationSubscription;
 
   // ── Initialization ─────────────────────────────────────────────────────────
 
@@ -91,6 +97,9 @@ class NotificationService {
 
     // 7. Setup Firebase Cloud Messaging
     await _setupFCM();
+
+    // 8. Listen for admin notifications from Firestore
+    _listenForAdminNotifications();
   }
 
   // ── Instant Notification ───────────────────────────────────────────────────
@@ -262,5 +271,53 @@ class NotificationService {
 
     // Register the background handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
+
+  // ── Firestore Admin Notification Listener ──────────────────────────────────
+
+  /// Listen to the Firestore `notifications` collection in real-time.
+  /// When the admin adds a new notification document, all connected
+  /// clients receive it and display a local notification.
+  void _listenForAdminNotifications() {
+    _notificationSubscription?.cancel();
+
+    _notificationSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) async {
+      if (snapshot.docs.isEmpty) return;
+
+      final doc = snapshot.docs.first;
+      final data = doc.data();
+      final notifId = doc.id;
+
+      // Check if we've already shown this notification
+      final prefs = await SharedPreferences.getInstance();
+      final lastSeenId = prefs.getString('last_seen_notification_id');
+      if (lastSeenId == notifId) return;
+
+      // Save this notification ID so we don't show it again
+      await prefs.setString('last_seen_notification_id', notifId);
+
+      // Show the notification locally
+      final title = data['title'] as String? ?? 'Notification';
+      final body = data['body'] as String? ?? '';
+      final payload = data['payload'] as String?;
+
+      await showInstantNotification(
+        title: title,
+        body: body,
+        payload: payload,
+        id: notifId.hashCode,
+      );
+    });
+  }
+
+  /// Stop listening for admin notifications (call on app dispose if needed).
+  void stopListening() {
+    _notificationSubscription?.cancel();
+    _notificationSubscription = null;
   }
 }
