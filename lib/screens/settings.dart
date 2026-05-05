@@ -261,8 +261,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           try {
                             final DatabaseService db = DatabaseService();
                             await db.sendNotificationToAll(
-                              title: 'Adaptiva Update 🔔',
-                              body: 'Check out the latest content on Adaptiva!',
+                              title: 'PulseStream Update 🔔',
+                              body: 'Check out the latest content on PulseStream!',
                               sentBy: _authService.currentUser?.id ?? 'admin',
                               payload: '{"type": "broadcast"}',
                             );

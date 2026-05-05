@@ -28,6 +28,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   String? _errorMessage;
   String _currentQuality = 'Auto';
   String _networkType = '';
+  String _detectedDuration = '';
 
   @override
   void initState() {
@@ -95,10 +96,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         betterPlayerDataSource: dataSource,
       );
 
-      // Listen for events to track watch progress
+      // Listen for events to track watch progress and detect duration
       controller.addEventsListener((event) {
         if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
           _onProgressUpdate(controller);
+        }
+        // Detect duration when video is initialized
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+          _onVideoInitialized(controller);
         }
       });
 
@@ -117,6 +122,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _errorMessage = e.toString();
         });
       }
+    }
+  }
+
+  void _onVideoInitialized(BetterPlayerController controller) {
+    final duration = controller.videoPlayerController?.value.duration;
+    if (duration != null && duration.inSeconds > 0) {
+      final formatted = _formatDuration(duration);
+      if (mounted) {
+        setState(() => _detectedDuration = formatted);
+      }
+
+      // Save to Firestore if stored duration is 0
+      if (widget.video.duration == 0) {
+        _databaseService.updateVideo(
+          widget.video.id,
+          {'duration': duration.inSeconds},
+        );
+        debugPrint('Auto-saved video duration: ${duration.inSeconds}s');
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    } else {
+      return '${seconds}s';
     }
   }
 
@@ -245,7 +283,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       color: AppTheme.textSecondary),
                                   const SizedBox(width: 4),
                                   Text(
-                                    widget.video.getFormattedDuration(),
+                                    _detectedDuration.isNotEmpty
+                                        ? _detectedDuration
+                                        : widget.video.getFormattedDuration(),
                                     style: TextStyle(
                                       color: AppTheme.textSecondary,
                                       fontSize: 14,

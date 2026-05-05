@@ -104,15 +104,21 @@ class Video {
   /// Whether this video has an HLS stream
   bool get isHls => hlsUrl != null && hlsUrl!.isNotEmpty;
 
-  /// Get formatted duration (e.g., "1h 30m")
+  /// Get formatted duration (e.g., "1h 30m", "5m 20s")
+  /// Returns "—" if duration is not yet detected.
   String getFormattedDuration() {
+    if (duration <= 0) return '—';
+
     final hours = duration ~/ 3600;
     final minutes = (duration % 3600) ~/ 60;
+    final seconds = duration % 60;
 
     if (hours > 0) {
       return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
     } else {
-      return '${minutes}m';
+      return '${seconds}s';
     }
   }
 }

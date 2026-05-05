@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mad_project/config/constants.dart';
 import 'package:mad_project/config/theme.dart';
@@ -5,6 +6,7 @@ import 'package:mad_project/services/auth_service.dart';
 import 'package:mad_project/services/database_service.dart';
 import 'package:mad_project/models/video.dart';
 import 'package:mad_project/screens/video_player_screen.dart';
+import 'package:mad_project/screens/edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -103,15 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Text(
-                        _getInitials(user?.name ?? 'User'),
-                        style: AppTheme.displaySmall.copyWith(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    child: _buildProfileAvatar(user),
                   ),
                   const SizedBox(height: AppConstants.spacingMedium),
                   // User Name
@@ -176,13 +170,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Edit profile feature coming soon!'),
-                            duration: Duration(milliseconds: 1500),
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
                           ),
                         );
+                        // Refresh profile if changes were saved
+                        if (result == true && mounted) {
+                          setState(() {});
+                        }
                       },
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit Profile'),
@@ -230,6 +228,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar(User? user) {
+    final photoUrl = user?.profileImageUrl;
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      // Local file path
+      if (photoUrl.startsWith('/') ||
+          photoUrl.contains('\\') ||
+          RegExp(r'^[A-Za-z]:\\').hasMatch(photoUrl)) {
+        final file = File(photoUrl);
+        if (file.existsSync()) {
+          return ClipOval(
+            child: Image.file(file, fit: BoxFit.cover,
+                width: 100, height: 100),
+          );
+        }
+      } else {
+        // Network URL
+        return ClipOval(
+          child: Image.network(
+            photoUrl,
+            fit: BoxFit.cover,
+            width: 100,
+            height: 100,
+            errorBuilder: (_, __, ___) => _buildInitialsAvatar(user),
+          ),
+        );
+      }
+    }
+    return _buildInitialsAvatar(user);
+  }
+
+  Widget _buildInitialsAvatar(User? user) {
+    return Center(
+      child: Text(
+        _getInitials(user?.name ?? 'User'),
+        style: AppTheme.displaySmall.copyWith(
+          color: AppTheme.primaryColor,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

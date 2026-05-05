@@ -333,26 +333,30 @@ class _SignInScreenState extends State<SignInScreen>
                               ),
 
                               // Create Account Section
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "Don't have an account? ",
-                                    style: AppTheme.bodyMedium.copyWith(
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: widget.onNavigateToSignUp,
-                                    child: Text(
-                                      'Create Account',
+                              SizedBox(
+                                width: double.infinity,
+                                child: Wrap(
+                                  alignment: WrapAlignment.center,
+                                  runAlignment: WrapAlignment.center,
+                                  children: [
+                                    Text(
+                                      "Don't have an account? ",
                                       style: AppTheme.bodyMedium.copyWith(
-                                        color: AppTheme.accentColor,
-                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.textSecondary,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    GestureDetector(
+                                      onTap: widget.onNavigateToSignUp,
+                                      child: Text(
+                                        'Create Account',
+                                        style: AppTheme.bodyMedium.copyWith(
+                                          color: AppTheme.accentColor,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

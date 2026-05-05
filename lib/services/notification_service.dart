@@ -36,10 +36,10 @@ class NotificationService {
       GlobalKey<NavigatorState>();
 
   // ── Android notification channel ───────────────────────────────────────────
-  static const String _channelId = 'adaptiva_channel';
-  static const String _channelName = 'Adaptiva Notifications';
+  static const String _channelId = 'pulsestream_channel';
+  static const String _channelName = 'PulseStream Notifications';
   static const String _channelDescription =
-      'Notifications for the Adaptiva streaming platform';
+      'Notifications for the PulseStream streaming platform';
 
   // Stores the payload from a notification that launched the app.
   static String? _initialPayload;
