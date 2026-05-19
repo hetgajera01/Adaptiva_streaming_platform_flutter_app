@@ -129,6 +129,19 @@ class _SignInScreenState extends State<SignInScreen>
     );
   }
 
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Email is required';
+    }
+
+    final email = value.trim();
+    final emailPattern = RegExp(r'^[\w\.-]+@([\w\-]+\.)+[A-Za-z]{2,}$');
+    if (!emailPattern.hasMatch(email)) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -222,15 +235,7 @@ class _SignInScreenState extends State<SignInScreen>
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 prefixIcon: Icons.email_outlined,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Email is required';
-                                  }
-                                  if (!value.contains('@')) {
-                                    return 'Enter a valid email';
-                                  }
-                                  return null;
-                                },
+                                validator: _validateEmail,
                               ),
 
                               SizedBox(

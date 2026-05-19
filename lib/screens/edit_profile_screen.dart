@@ -171,16 +171,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // For profile image, we store the local file path
-      // In production, you'd upload to Firebase Storage/S3 and get a URL
-      String? photoUrl = _existingPhotoUrl;
-      if (_pickedImage != null) {
-        photoUrl = _pickedImage!.path;
-      }
-
       await _authService.updateProfile(
         name: _nameCtrl.text.trim(),
-        profileImageUrl: photoUrl,
+        profileImageFile: _pickedImage,
       );
 
       if (mounted) {

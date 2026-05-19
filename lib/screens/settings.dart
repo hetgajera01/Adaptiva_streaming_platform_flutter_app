@@ -24,7 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedVideoQuality = 'Auto';
   bool _notificationsEnabled = true;
   bool _autoPlayEnabled = true;
-  bool _downloadOnWifiOnly = true;
   bool _isLoggingOut = false;
 
   @override
@@ -40,7 +39,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _selectedVideoQuality = prefs.getString('video_quality') ?? 'Auto';
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _autoPlayEnabled = prefs.getBool('autoplay_enabled') ?? true;
-      _downloadOnWifiOnly = prefs.getBool('download_wifi_only') ?? true;
     });
   }
 
@@ -50,7 +48,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setString('video_quality', _selectedVideoQuality);
     await prefs.setBool('notifications_enabled', _notificationsEnabled);
     await prefs.setBool('autoplay_enabled', _autoPlayEnabled);
-    await prefs.setBool('download_wifi_only', _downloadOnWifiOnly);
   }
 
   /// Handle logout
@@ -214,23 +211,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: _autoPlayEnabled,
                       onChanged: (value) {
                         setState(() => _autoPlayEnabled = value);
-                        _saveSettings();
-                      },
-                    ),
-                  ]),
-
-                  const SizedBox(height: AppConstants.spacingLarge),
-
-                  // Download Settings
-                  _buildSectionHeader('Downloads'),
-                  _buildSettingsCard([
-                    _buildSwitchTile(
-                      icon: Icons.wifi,
-                      title: 'Wi-Fi Only',
-                      subtitle: 'Download only on Wi-Fi',
-                      value: _downloadOnWifiOnly,
-                      onChanged: (value) {
-                        setState(() => _downloadOnWifiOnly = value);
                         _saveSettings();
                       },
                     ),

@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:convert';
+import 'dart:io';
 
 /// Exception classes for authentication errors
 class AuthException implements Exception {
@@ -320,16 +322,42 @@ class AuthService {
     }
   }
 
+  /// Upload profile image to Firebase Storage
+  Future<String> _uploadProfileImage(File imageFile) async {
+    try {
+      final userId = _currentUser!.id;
+      final fileName = 'profile_images/$userId.jpg';
+      final ref = FirebaseStorage.instance.ref().child(fileName);
+
+      // Upload the file
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask.whenComplete(() => null);
+
+      // Get the download URL
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw AuthException('Failed to upload profile image: $e');
+    }
+  }
+
   /// Update user profile (local + Firestore)
   Future<User> updateProfile({
     required String name,
-    String? profileImageUrl,
+    File? profileImageFile,
   }) async {
     if (_currentUser == null) {
       throw AuthException('No user logged in.');
     }
 
     try {
+      String? profileImageUrl = _currentUser!.profileImageUrl;
+
+      // Upload new profile image if provided
+      if (profileImageFile != null) {
+        profileImageUrl = await _uploadProfileImage(profileImageFile);
+      }
+
       final updatedUser = User(
         id: _currentUser!.id,
         email: _currentUser!.email,
